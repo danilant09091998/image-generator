@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Multi-Image Generator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #ec4899 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 40px; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { 
+            font-size: 1rem; opacity: 0.9; background: rgba(255,255,255,0.1); 
+            padding: 8px 16px; border-radius: 20px; display: inline-block; 
+        }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        @media (max-width: 1200px) { .main-content { grid-template-columns: 1fr; } }
+        .card {
+            background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 30px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px);
+        }
+        .card h2 { font-size: 1.5rem; margin-bottom: 20px; color: #333; }
+        .tab-buttons { display: flex; gap: 10px; margin-bottom: 25px; }
+        .tab-btn {
+            flex: 1; padding: 12px; border: 2px solid #4f46e5; background: white; color: #4f46e5;
+            border-radius: 10px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s; font-weight: 600;
+        }
+        .tab-btn:hover { background: #f0f0ff; transform: translateY(-2px); }
+        .tab-btn.active { background: #4f46e5; color: white; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4); }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; }
+        .form-group textarea {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px;
+            font-size: 1rem; min-height: 100px; resize: vertical; font-family: inherit;
+        }
+        .form-group textarea:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .upload-area {
+            border: 2px dashed #4f46e5; border-radius: 10px; padding: 30px; text-align: center;
+            cursor: pointer; background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%); transition: all 0.3s;
+        }
+        .upload-area:hover { background: linear-gradient(135deg, #f0f2ff 0%, #e8ebff 100%); transform: translateY(-2px); }
+        .upload-area.drag-over { background: #e8ebff; border-color: #5568d3; transform: scale(1.02); }
+        .upload-icon { font-size: 3rem; margin-bottom: 10px; }
+        .file-input { display: none; }
+        .multi-file-input { display: none; }
+        .preview-container { margin-top: 20px; }
+        .preview-image { max-width: 100%; max-height: 200px; border-radius: 10px; margin-bottom: 10px; }
+        
+        /* Multi-image styles */
+        .multi-upload-area {
+            border: 2px dashed #ec4899; border-radius: 10px; padding: 30px; text-align: center;
+            cursor: pointer; background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); transition: all 0.3s;
+        }
+        .multi-upload-area:hover { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); transform: translateY(-2px); }
+        .multi-upload-area.drag-over { background: #fbcfe8; border-color: #db2777; transform: scale(1.02); }
+        .multi-preview-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;
+        }
+        .multi-image-item {
+            position: relative; background: #f8f9ff; border-radius: 10px; padding: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        .multi-image-preview { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; }
+        .remove-image {
+            position: absolute; top: 5px; right: 5px; background: #ef4444; color: white;
+            border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer;
+            font-size: 12px; display: flex; align-items: center; justify-content: center;
+        }
+        .image-counter {
+            text-align: center; margin-top: 10px; color: #666; font-size: 0.9rem;
+            background: #f0f0f0; padding: 5px 10px; border-radius: 15px; display: inline-block;
+        }
+        
+        .btn {
+            width: 100%; padding: 15px; border: none; border-radius: 10px; font-size: 1.1rem;
+            font-weight: 700; cursor: pointer; transition: all 0.3s; letter-spacing: 0.3px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+        }
+        .btn-combine {
+            background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); color: white;
+            box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
+        }
+        .btn-primary:hover:not(:disabled), .btn-combine:hover:not(:disabled) { 
+            transform: translateY(-3px); box-shadow: 0 8px 25px rgba(79, 70, 229, 0.5); 
+        }
+        .btn-primary:disabled, .btn-combine:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #f0f0f0; color: #333; margin-top: 10px; font-weight: 600; }
+        .btn-secondary:hover { background: #e0e0e0; transform: translateY(-2px); }
+        
+        .result-area { text-align: center; min-height: 400px; display: flex; flex-direction: column; justify-content: center; }
+        .result-placeholder { color: #999; font-size: 1.1rem; padding: 60px 20px; }
+        .result-image { max-width: 100%; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+        .loading { text-align: center; padding: 50px 20px; }
+        .loading-spinner {
+            border: 5px solid #f3f3f3; border-top: 5px solid #4f46e5; border-radius: 50%;
+            width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 0 auto 25px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { font-size: 1.2rem; color: #555; margin-bottom: 10px; font-weight: 600; }
+        .loading-hint { font-size: 0.95rem; color: #999; }
+        .status-message {
+            padding: 16px 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; font-weight: 500;
+        }
+        .status-message.success { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .status-message.error { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .status-message.info { background: #e8ebff; color: #4f46e5; border: 2px solid #c3c6e8; }
+        .footer { text-align: center; color: white; padding: 30px 20px; opacity: 0.9; margin-top: 40px; }
+        .gemini-badge {
+            background: linear-gradient(45deg, #4285f4, #34a853, #fbbc04, #ea4335);
+            color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;
+        }
+        .multi-badge {
+            background: linear-gradient(45deg, #ec4899, #8b5cf6);
+            color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold;
+        }
+        .example-prompts {
+            background: #f8f9ff; border-radius: 8px; padding: 15px; margin-top: 10px;
+            font-size: 0.9rem; color: #666;
+        }
+        .example-prompts .title { font-weight: 600; margin-bottom: 8px; color: #333; }
+        .example-prompts .item { margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 Gemini Multi-Image Generator</h1>
+            <div class="subtitle">
+                <span class="gemini-badge">Google AI</span>
+                <span class="multi-badge">Multi-Image</span>
+                Создание, редактирование и объединение изображений
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>⚡ Управление</h2>
+                
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="switchTab('generate')">🎨 Создать</button>
+                    <button class="tab-btn" onclick="switchTab('edit')">✏️ Редактировать</button>
+                    <button class="tab-btn" onclick="switchTab('combine')">🔄 Объединить</button>
+                </div>
+
+                <!-- Вкладка: Создать изображение -->
+                <div id="generate-tab" class="tab-content active">
+                    <div class="form-group">
+                        <label for="prompt">📝 Опишите изображение:</label>
+                        <textarea id="prompt" placeholder="Например: футуристический город на закате с летающими автомобилями и неоновыми огнями"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="generateImage()">🚀 Создать с Gemini</button>
+                </div>
+
+                <!-- Вкладка: Редактировать изображение -->
+                <div id="edit-tab" class="tab-content">
+                    <div class="form-group">
+                        <label>🖼️ Загрузите изображение:</label>
+                        <div class="upload-area" id="uploadArea">
+                            <div class="upload-icon">📤</div>
+                            <p>Перетащите изображение или нажмите для выбора</p>
+                            <input type="file" id="imageInput" class="file-input" accept="image/*">
+                        </div>
+                        <div id="previewContainer" class="preview-container" style="display: none;">
+                            <img id="previewImage" class="preview-image" alt="Preview">
+                            <button class="btn btn-secondary" onclick="clearImage()">🗑️ Удалить</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPrompt">✨ Как изменить изображение:</label>
+                        <textarea id="editPrompt" placeholder="Например: сделай небо фиолетовым, добавь звезды, измени стиль на винтажный"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="editImage()" id="editBtn" disabled>🎨 Редактировать с Gemini</button>
+                </div>
+
+                <!-- Вкладка: Объединить изображения -->
+                <div id="combine-tab" class="tab-content">
+                    <div class="form-group">
+                        <label>🖼️ Загрузите несколько изображений (2-10):</label>
+                        <div class="multi-upload-area" id="multiUploadArea">
+                            <div class="upload-icon">📤</div>
+                            <p><strong>Перетащите несколько изображений сюда</strong></p>
+                            <p style="font-size: 0.9rem; margin-top: 5px;">или нажмите для выбора файлов</p>
+                            <input type="file" id="multiImageInput" class="multi-file-input" accept="image/*" multiple>
+                        </div>
+                        <div id="multiPreviewContainer" class="multi-preview-container"></div>
+                        <div id="imageCounter" class="image-counter" style="display: none;">
+                            Загружено: <span id="imageCount">0</span> изображений
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="combinePrompt">🔄 Как объединить изображения:</label>
+                        <textarea id="combinePrompt" placeholder="Например: создай коллаж в стиле винтаж, объедини в одну панораму, создай сюрреалистичную композицию"></textarea>
+                        <div class="example-prompts">
+                            <div class="title">💡 Примеры промптов для объединения:</div>
+                            <div class="item">• "Создай панораму из этих пейзажей"</div>
+                            <div class="item">• "Объедини в коллаж в стиле Instagram"</div>
+                            <div class="item">• "Создай сюрреалистичную композицию"</div>
+                            <div class="item">• "Сделай цифровой арт в стиле cyberpunk"</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-combine" onclick="combineImages()" id="combineBtn" disabled>🔄 Объединить с Gemini</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🎨 Результат</h2>
+                <div id="resultArea" class="result-area">
+                    <p class="result-placeholder">
+                        Здесь появится изображение, созданное Gemini 2.5 Flash<br>
+                        <span style="font-size: 0.9rem; opacity: 0.7;">Выберите режим и начните творить! ✨</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Powered by Google Gemini 2.5 Flash Image Preview через OpenRouter</p>
+            <p style="font-size: 0.9rem; margin-top: 5px;">⚡ Поддерживает множественную загрузку и объединение изображений</p>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ ВАЖНО: ЗАМЕНИТЕ НА ВАШ WEBHOOK URL ИЗ N8N ⚠️
+        const WEBHOOK_URL = 'https://flashbooostern8n.ru/webhook/gemini-multi-image';
+        // ⚠️ Замените на Production URL из узла Webhook ⚠️
+        
+        let uploadedImage = null;
+        let uploadedImages = [];
+        const MAX_IMAGES = 10;
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + '-tab').classList.add('active');
+        }
+
+        // Настройка загрузки одного изображения (для редактирования)
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+
+        uploadArea.addEventListener('click', () => imageInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            if (e.dataTransfer.files[0]) handleSingleFile(e.dataTransfer.files[0]);
+        });
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) handleSingleFile(e.target.files[0]);
+        });
+
+        // Настройка загрузки множественных изображений
+        const multiUploadArea = document.getElementById('multiUploadArea');
+        const multiImageInput = document.getElementById('multiImageInput');
+        const multiPreviewContainer = document.getElementById('multiPreviewContainer');
+        const imageCounter = document.getElementById('imageCounter');
+        const imageCountSpan = document.getElementById('imageCount');
+
+        multiUploadArea.addEventListener('click', () => multiImageInput.click());
+        multiUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            multiUploadArea.classList.add('drag-over');
+        });
+        multiUploadArea.addEventListener('dragleave', () => multiUploadArea.classList.remove('drag-over'));
+        multiUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            multiUploadArea.classList.remove('drag-over');
+            handleMultipleFiles(e.dataTransfer.files);
+        });
+        multiImageInput.addEventListener('change', (e) => {
+            handleMultipleFiles(e.target.files);
+        });
+
+        function handleSingleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showStatus('⚠️ Пожалуйста, выберите файл изображения', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImage = e.target.result;
+                previewImage.src = uploadedImage;
+                previewContainer.style.display = 'block';
+                uploadArea.style.display = 'none';
+                document.getElementById('editBtn').disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleMultipleFiles(files) {
+            const fileArray = Array.from(files);
+            const imageFiles = fileArray.filter(file => file.type.startsWith('image/'));
+            
+            if (imageFiles.length === 0) {
+                showStatus('⚠️ Выберите файлы изображений', 'error');
+                return;
+            }
+
+            if (uploadedImages.length + imageFiles.length > MAX_IMAGES) {
+                showStatus(`⚠️ Максимум ${MAX_IMAGES} изображений`, 'error');
+                return;
+            }
+
+            imageFiles.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImages.push(e.target.result);
+                    updateMultiPreview();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateMultiPreview() {
+            multiPreviewContainer.innerHTML = '';
+            
+            uploadedImages.forEach((imageData, index) => {
+                const item = document.createElement('div');
+                item.className = 'multi-image-item';
+                item.innerHTML = `
+                    <img src="${imageData}" class="multi-image-preview" alt="Image ${index + 1}">
+                    <button class="remove-image" onclick="removeImage(${index})">×</button>
+                `;
+                multiPreviewContainer.appendChild(item);
+            });
+
+            imageCountSpan.textContent = uploadedImages.length;
+            imageCounter.style.display = uploadedImages.length > 0 ? 'block' : 'none';
+            document.getElementById('combineBtn').disabled = uploadedImages.length < 2;
+        }
+
+        function removeImage(index) {
+            uploadedImages.splice(index, 1);
+            updateMultiPreview();
+        }
+
+        function clearImage() {
+            uploadedImage = null;
+            previewContainer.style.display = 'none';
+            uploadArea.style.display = 'block';
+            imageInput.value = '';
+            document.getElementById('editBtn').disabled = true;
+        }
+
+        function clearMultiImages() {
+            uploadedImages = [];
+            updateMultiPreview();
+        }
+
+        async function generateImage() {
+            const prompt = document.getElementById('prompt').value.trim();
+            if (!prompt) {
+                showStatus('⚠️ Пожалуйста, введите описание изображения', 'error');
+                return;
+            }
+
+            showLoading('🧠 Gemini создает изображение по вашему описанию...');
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: 'generate', prompt: prompt })
+                });
+
+                const data = await response.json();
+                if (data.success && data.imageUrl) {
+                    showResult(data.imageUrl);
+                    showStatus('✅ Изображение создано!', 'success');
+                } else {
+                    throw new Error(data.error || 'Не удалось создать изображение');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('❌ Ошибка: ' + error.message, 'error');
+                showPlaceholder();
+            }
+        }
+
+        async function editImage() {
+            const editPrompt = document.getElementById('editPrompt').value.trim();
+            if (!editPrompt) {
+                showStatus('⚠️ Опишите как изменить изображение', 'error');
+                return;
+            }
+            if (!uploadedImage) {
+                showStatus('⚠️ Сначала загрузите изображение', 'error');
+                return;
+            }
+
+            showLoading('✨ Gemini анализирует и редактирует изображение...');
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: 'edit', prompt: editPrompt, image: uploadedImage })
+                });
+
+                const data = await response.json();
+                if (data.success && data.imageUrl) {
+                    showResult(data.imageUrl);
+                    showStatus('✅ Изображение отредактировано!', 'success');
+                } else {
+                    throw new Error(data.error || 'Не удалось отредактировать изображение');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('❌ Ошибка: ' + error.message, 'error');
+                showPlaceholder();
+            }
+        }
+
+        async function combineImages() {
+            const combinePrompt = document.getElementById('combinePrompt').value.trim();
+            if (!combinePrompt) {
+                showStatus('⚠️ Опишите как объединить изображения', 'error');
+                return;
+            }
+            if (uploadedImages.length < 2) {
+                showStatus('⚠️ Загрузите минимум 2 изображения', 'error');
+                return;
+            }
+
+            showLoading(`🔄 Gemini объединяет ${uploadedImages.length} изображений...`);
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        mode: 'combine', 
+                        prompt: combinePrompt, 
+                        images: uploadedImages 
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success && data.imageUrl) {
+                    showResult(data.imageUrl);
+                    showStatus(`✅ ${uploadedImages.length} изображений успешно объединены!`, 'success');
+                } else {
+                    throw new Error(data.error || 'Не удалось объединить изображения');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('❌ Ошибка: ' + error.message, 'error');
+                showPlaceholder();
+            }
+        }
+
+        function showLoading(message) {
+            document.getElementById('resultArea').innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p class="loading-text">${message}</p>
+                    <p class="loading-hint">Многоизображенье может занимать больше времени ⏱️</p>
+                </div>
+            `;
+        }
+
+        function showResult(imageUrl) {
+            document.getElementById('resultArea').innerHTML = `
+                <img src="${imageUrl}" class="result-image" alt="Generated by Gemini">
+                <button class="btn btn-secondary" onclick="downloadImage('${imageUrl}')">
+                    💾 Скачать изображение
+                </button>
+            `;
+        }
+
+        function showPlaceholder() {
+            document.getElementById('resultArea').innerHTML = 
+                '<p class="result-placeholder">Не удалось создать изображение<br><span style="font-size: 0.9rem; opacity: 0.7;">Попробуйте другое описание</span></p>';
+        }
+
+        function showStatus(message, type) {
+            const resultArea = document.getElementById('resultArea');
+            const existing = resultArea.querySelector('.status-message');
+            if (existing) existing.remove();
+
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.textContent = message;
+            resultArea.insertBefore(statusDiv, resultArea.firstChild);
+            setTimeout(() => statusDiv.remove(), 7000);
+        }
+
+        function downloadImage(url) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'gemini-multi-generated-' + Date.now() + '.png';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Проверка настройки
+        window.addEventListener('load', () => {
+            if (WEBHOOK_URL.includes('your-n8n-instance.com')) {
+                showStatus('⚠️ Настройте WEBHOOK_URL в коде!', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
